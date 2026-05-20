@@ -25,13 +25,17 @@ bindkey '^[[F' end-of-line
 if [[ -n "${terminfo[kend]}" ]]; then
   bindkey "${terminfo[kend]}" end-of-line
 fi
-bindkey '[A' up-line-or-search
-bindkey '[B' down-line-or-search
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
+bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
 
 # History
 setopt hist_verify
 setopt share_history
 setopt hist_ignore_dups
+setopt hist_find_no_dups
 HISTFILE=~/.zhistory
 HISTSIZE=10000
 SAVEHIST=10000
@@ -108,6 +112,7 @@ alias cp='cp -i'
 alias mv='mv -i'
 alias _='sudo'
 alias ...='../..'
+alias cc='claude'
 
 if command -v bat > /dev/null 2>&1; then
   alias cat='bat'
