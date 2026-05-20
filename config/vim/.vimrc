@@ -6,8 +6,10 @@ let s:config_dir = s:vim_runtime_dir . '/vimrc'
 let s:repo_local_config = s:vim_runtime_dir . '/local.vim'
 let s:home_local_config = expand('~/.vim/local.vim')
 
-execute 'set runtimepath^=' . fnameescape(s:vim_runtime_dir)
-execute 'set packpath^=' . fnameescape(s:vim_runtime_dir)
+" scripts/setup symlinks ~/.vim and ~/.vimrc to this repo, so the default
+" runtimepath/packpath already cover everything here. Explicit `set ^=` calls
+" would re-add the same dir under two paths, causing pack plugins to load
+" twice and the TypeScript syntax to load in a broken state.
 
 if filereadable(s:repo_local_config)
   execute 'source' fnameescape(s:repo_local_config)

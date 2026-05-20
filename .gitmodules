@@ -53,3 +53,6 @@
 [submodule "config/vim/.vim/pack/plugins/start/fzf"]
 	path = config/vim/.vim/pack/plugins/start/fzf
 	url = https://github.com/junegunn/fzf
+[submodule "config/vim/.vim/pack/plugins/start/yats.vim"]
+	path = config/vim/.vim/pack/plugins/start/yats.vim
+	url = https://github.com/HerringtonDarkholme/yats.vim
