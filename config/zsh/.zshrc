@@ -28,8 +28,12 @@ fi
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
 zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
-bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
-bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
+if [[ -n "${terminfo[kcuu1]}" ]]; then
+  bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
+fi
+if [[ -n "${terminfo[kcud1]}" ]]; then
+  bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
+fi
 
 # History
 setopt hist_verify
@@ -132,28 +136,32 @@ zstyle ':completion:*' menu select=2
 autoload -U compinit
 compinit -d
 
-# SSH agent
-if command -v pgrep > /dev/null 2>&1 && command -v ssh-agent > /dev/null 2>&1; then
-  ssh_agent_env="${XDG_RUNTIME_DIR:-/tmp}/ssh-agent.env"
-  if ! pgrep -u "$USER" ssh-agent > /dev/null 2>&1; then
-    ssh-agent > "$ssh_agent_env"
-  fi
-  if [[ -z "${SSH_AUTH_SOCK:-}" && -r "$ssh_agent_env" ]]; then
-    eval "$(<"$ssh_agent_env")" > /dev/null
-  fi
-  unset ssh_agent_env
-fi
+# SSH agent and nvm are set up in ~/.zshenv so they're available in
+# every shell, not just interactive ones.
 
-# nvm
-for nvm_source in \
-  /usr/share/nvm/init-nvm.sh \
-  "$HOME/.nvm/nvm.sh"; do
-  if [[ -r "$nvm_source" ]]; then
-    source "$nvm_source"
-    break
+# Automatically select the Node version requested by the nearest .nvmrc.
+# Do not download runtimes implicitly; install a missing version explicitly.
+nvm_auto_use() {
+  (( $+functions[nvm] && $+functions[nvm_find_nvmrc] )) || return
+
+  local nvmrc_path requested_version resolved_version
+  nvmrc_path="$(nvm_find_nvmrc)"
+  [[ -n "$nvmrc_path" ]] || return
+
+  requested_version="$(<"$nvmrc_path")"
+  [[ -n "$requested_version" ]] || return
+  resolved_version="$(nvm version "$requested_version")"
+
+  if [[ "$resolved_version" == "N/A" ]]; then
+    print -u2 "nvm: $requested_version from $nvmrc_path is not installed; run nvm install"
+  elif [[ "$(nvm current)" != "$resolved_version" ]]; then
+    nvm use --silent "$requested_version"
   fi
-done
-unset nvm_source
+}
+
+autoload -Uz add-zsh-hook
+add-zsh-hook chpwd nvm_auto_use
+nvm_auto_use
 
 # Directory jumping
 if command -v zoxide > /dev/null 2>&1; then
@@ -163,3 +171,6 @@ fi
 if [[ -f ~/.zshrc.local ]]; then
   source ~/.zshrc.local
 fi
+
+# Codex installer previously appended a PATH export for ~/.local/bin here;
+# that's now handled in ~/.zshenv (see top of file).
