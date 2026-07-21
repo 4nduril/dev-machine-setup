@@ -10,6 +10,7 @@ This repo manages:
 - Kitty
 - Git defaults
 - EditorConfig, ESLint, and TypeScript home defaults
+- shared coding-agent rules for Claude Code and Codex
 - project-copyable templates
 - the Literation Mono Nerd Font used for terminal/editor icons
 - a Bash setup script for symlinking configs and bootstrapping user-space tools
@@ -87,6 +88,7 @@ overwritten silently.
 assets/
   fonts/
 config/
+  agents/
   bash/
   editorconfig/
   eslint/
@@ -114,6 +116,19 @@ Copy files from `templates/` into projects when useful:
 
 The EditorConfig, ESLint, and TypeScript defaults are also deployed to `$HOME`.
 Prettier and Vitest are templates only.
+
+## Coding Agent Rules
+
+`config/agents/AGENTS.md` holds the general working agreement for coding agents
+— git and PR rules, the definition of done, testing expectations, and shared
+code conventions. It is deployed to both agent locations as symlinks to the same
+file:
+
+- `~/.codex/AGENTS.md` (Codex)
+- `~/.claude/CLAUDE.md` (Claude Code)
+
+Keep it tool-agnostic and repo-agnostic. Project-specific guidance belongs in an
+`AGENTS.md` in that project, which takes precedence on conflict.
 
 ## Vim
 

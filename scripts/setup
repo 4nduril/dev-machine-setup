@@ -201,6 +201,8 @@ deploy_configs() {
     "$repo_root/config/vim/.vim|$HOME/.vim"
     "$repo_root/config/eslint/eslint.config.mts|$HOME/eslint.config.mts"
     "$repo_root/config/typescript/tsconfig.json|$HOME/tsconfig.json"
+    "$repo_root/config/agents/AGENTS.md|$HOME/.codex/AGENTS.md"
+    "$repo_root/config/agents/AGENTS.md|$HOME/.claude/CLAUDE.md"
   )
   local entry
   local source
