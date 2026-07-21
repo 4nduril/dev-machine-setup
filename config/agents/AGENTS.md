@@ -73,7 +73,6 @@ Defaults across all projects — a repo's own config always wins.
   `arrowParens: "avoid"`. Never hand-format; never reformat untouched lines.
 - **Naming**: `verbNoun` for functions, `camelCase` for variables,
   `UPPER_SNAKE_CASE` for constants, `kebab-case.ts` for files.
-- **npm** is the package manager. Not pnpm, not yarn, not bun.
 - Prefer structured logging with context over `console.log`.
 - Match the surrounding code's idiom, comment density, and naming. Comments
   explain *why*, not *what*.
