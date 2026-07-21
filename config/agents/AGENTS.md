@@ -41,13 +41,16 @@ Commits:
 
 ## Definition of Done
 
-Before pushing or opening a PR, all of these must be green:
+Before pushing or opening a PR, all three of these must be green:
 
-```bash
-npm run tsc     # or the repo's type-check script — never bare `tsc`
-npm run lint
-npm test        # full suite, not just affected tests
-```
+1. **Type check**
+2. **Lint**
+3. **Tests** — the full suite, not just the affected tests
+
+Always invoke them through the repo's own scripts, using the repo's package
+manager. Never run a tool directly when a script wraps it — a bare `tsc`, for
+example, writes compiled output into the working tree instead of just checking
+types.
 
 If something fails and you cannot fix it within the scope of the task, **stop
 and report** rather than pushing. A red PR is worse than no PR.
