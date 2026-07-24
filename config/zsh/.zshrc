@@ -100,6 +100,7 @@ alias glo='git log --oneline --decorate'
 alias glog='git log --oneline --graph --decorate'
 alias gm='git merge'
 alias gp='git push'
+alias gpf='git push --force-with-lease'
 alias gst='git status'
 
 if command -v fzf > /dev/null 2>&1; then
@@ -117,6 +118,7 @@ alias mv='mv -i'
 alias _='sudo'
 alias ...='../..'
 alias cc='claude'
+alias cca='claude --permission-mode auto'
 
 if command -v bat > /dev/null 2>&1; then
   alias cat='bat'
