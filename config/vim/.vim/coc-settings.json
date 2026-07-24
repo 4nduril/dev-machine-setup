@@ -10,6 +10,7 @@
     "json",
     "graphql"
   ],
+  "css.lint.unknownAtRules": "ignore",
   "coc.preferences.hoverTarget": "echo",
   "diagnostic.errorSign": "✘",
   "diagnostic.warningSign": "⚠",
