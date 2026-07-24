@@ -221,6 +221,19 @@ deploy_configs() {
   fi
 }
 
+deploy_bin() {
+  local bin_dir="$repo_root/config/bin"
+  local target_dir="$HOME/.local/bin"
+  local source
+
+  [[ -d "$bin_dir" ]] || return 0
+
+  for source in "$bin_dir"/*; do
+    [[ -f "$source" ]] || continue
+    link_config "$source" "$target_dir/$(basename -- "$source")"
+  done
+}
+
 write_git_identity() {
   local local_config="$HOME/.gitconfig.local"
   local name
@@ -384,6 +397,7 @@ main() {
   git -C "$repo_root" submodule update --init --recursive
   install_font
   deploy_configs
+  deploy_bin
   write_git_identity
   write_npm_identity
   setup_node
