@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+// Minimal no-op language server. Speaks just enough LSP for the editor to
+// consider it started, but advertises no capabilities, so it neither reports
+// diagnostics nor registers a formatter. Used by the ox* wrappers when a
+// project has no ox config file, so the editor gets a well-behaved server
+// instead of a "failed to start" error, and prettier/eslint stay in charge.
+'use strict'
+
+let buf = Buffer.alloc(0)
+
+function reply(id, result) {
+  const payload = JSON.stringify({ jsonrpc: '2.0', id, result })
+  process.stdout.write('Content-Length: ' + Buffer.byteLength(payload) + '\r\n\r\n' + payload)
+}
+
+process.stdin.on('data', (chunk) => {
+  buf = Buffer.concat([buf, chunk])
+  for (;;) {
+    const headerEnd = buf.indexOf('\r\n\r\n')
+    if (headerEnd === -1) break
+    const match = /Content-Length:\s*(\d+)/i.exec(buf.slice(0, headerEnd).toString('ascii'))
+    const start = headerEnd + 4
+    if (!match) { buf = buf.slice(start); continue }
+    const len = parseInt(match[1], 10)
+    if (buf.length < start + len) break
+    const body = buf.slice(start, start + len).toString('utf8')
+    buf = buf.slice(start + len)
+
+    let msg
+    try { msg = JSON.parse(body) } catch { continue }
+
+    if (msg.method === 'initialize') {
+      reply(msg.id, { capabilities: {} })
+    } else if (msg.method === 'shutdown') {
+      reply(msg.id, null)
+    } else if (msg.method === 'exit') {
+      process.exit(0)
+    } else if (msg.id !== undefined && msg.method !== undefined) {
+      // Answer any other request so the client never blocks waiting on us.
+      reply(msg.id, null)
+    }
+  }
+})
+
+process.stdin.on('end', () => process.exit(0))

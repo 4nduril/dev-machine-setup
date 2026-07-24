@@ -8,15 +8,32 @@
     "typescript",
     "typescriptreact",
     "json",
-    "graphql"
+    "graphql",
+    "yaml",
+    "html"
   ],
   "css.lint.unknownAtRules": "ignore",
+  "prettier.requireConfig": true,
+  "coc.preferences.formatOnSaveTimeout": 3000,
   "coc.preferences.hoverTarget": "echo",
   "diagnostic.errorSign": "✘",
   "diagnostic.warningSign": "⚠",
   "diagnostic.hintSign": "⚠",
   "diagnostic.infoSign": "ℹ",
   "languageserver": {
+    "oxlint": {
+      "command": "oxlint-lsp",
+      "args": ["--lsp"],
+      "filetypes": ["*"],
+      "rootPatterns": [".oxlintrc.json"]
+    },
+    "oxfmt": {
+      "command": "oxfmt-lsp",
+      "args": ["--lsp"],
+      "filetypes": ["*"],
+      "rootPatterns": [".oxfmtrc.json"],
+      "formatterPriority": 100
+    },
     "graphql": {
       "command": "graphql-lsp",
       "args": ["server", "-m", "stream"],

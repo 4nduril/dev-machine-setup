@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Start the oxlint LSP only in projects that actually use oxlint (an .oxlintrc.json
+# somewhere at or above the working directory). There, run the workspace-local
+# oxlint so the editor's linter version matches the project, falling back to a
+# global oxlint. Elsewhere, hand the editor a no-op LSP so it neither errors on
+# start nor reports diagnostics where eslint is in charge. Args after the marker
+# are passed to oxlint (the editor adds --lsp).
+set -euo pipefail
+
+tool=oxlint
+marker=.oxlintrc.json
+
+dir=$PWD
+while [[ "$dir" != / ]]; do
+  if [[ -f "$dir/$marker" ]]; then
+    if [[ -x "$dir/node_modules/.bin/$tool" ]]; then
+      exec "$dir/node_modules/.bin/$tool" "$@"
+    fi
+    exec "$tool" "$@"
+  fi
+  dir=$(dirname -- "$dir")
+done
+
+exec noop-lsp
