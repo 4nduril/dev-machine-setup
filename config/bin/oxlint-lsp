@@ -2,9 +2,10 @@
 # Start the oxlint LSP only in projects that actually use oxlint (an .oxlintrc.json
 # somewhere at or above the working directory). There, run the workspace-local
 # oxlint so the editor's linter version matches the project, falling back to a
-# global oxlint. Elsewhere, hand the editor a no-op LSP so it neither errors on
-# start nor reports diagnostics where eslint is in charge. Args after the marker
-# are passed to oxlint (the editor adds --lsp).
+# global oxlint. Elsewhere — and in an oxlint project whose dependencies are not
+# installed — hand the editor a no-op LSP so it neither errors on start nor
+# reports diagnostics where eslint is in charge. Args after the marker are passed
+# to oxlint (the editor adds --lsp).
 set -euo pipefail
 
 tool=oxlint
@@ -16,7 +17,10 @@ while [[ "$dir" != / ]]; do
     if [[ -x "$dir/node_modules/.bin/$tool" ]]; then
       exec "$dir/node_modules/.bin/$tool" "$@"
     fi
-    exec "$tool" "$@"
+    if command -v "$tool" >/dev/null 2>&1; then
+      exec "$tool" "$@"
+    fi
+    break
   fi
   dir=$(dirname -- "$dir")
 done
