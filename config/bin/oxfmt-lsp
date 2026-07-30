@@ -2,9 +2,10 @@
 # Start the oxfmt LSP only in projects that actually use oxfmt (an .oxfmtrc.json
 # somewhere at or above the working directory). There, run the workspace-local
 # oxfmt so the editor's formatter version matches the project (and CI
-# `oxfmt --check`), falling back to a global oxfmt. Elsewhere, hand the editor a
-# no-op LSP so it neither errors on start nor takes over formatting from
-# prettier. Args after the marker are passed to oxfmt (the editor adds --lsp).
+# `oxfmt --check`), falling back to a global oxfmt. Elsewhere — and in an oxfmt
+# project whose dependencies are not installed — hand the editor a no-op LSP so
+# it neither errors on start nor takes over formatting from prettier. Args after
+# the marker are passed to oxfmt (the editor adds --lsp).
 set -euo pipefail
 
 tool=oxfmt
@@ -16,7 +17,10 @@ while [[ "$dir" != / ]]; do
     if [[ -x "$dir/node_modules/.bin/$tool" ]]; then
       exec "$dir/node_modules/.bin/$tool" "$@"
     fi
-    exec "$tool" "$@"
+    if command -v "$tool" >/dev/null 2>&1; then
+      exec "$tool" "$@"
+    fi
+    break
   fi
   dir=$(dirname -- "$dir")
 done
