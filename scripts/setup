@@ -126,11 +126,6 @@ print_package_instructions() {
   esac
 }
 
-has_zsh_autosuggestions() {
-  [[ -r /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ||
-     -r /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]
-}
-
 find_nvm_source() {
   local candidate
   for candidate in \
@@ -173,7 +168,6 @@ check_requirements() {
     command -v ssh-agent > /dev/null 2>&1 || missing+=("openssh/ssh-agent")
     command -v pgrep > /dev/null 2>&1 || missing+=("procps/pgrep")
     command -v corepack > /dev/null 2>&1 || missing+=("corepack")
-    has_zsh_autosuggestions || missing+=("zsh-autosuggestions")
     find_nvm_source > /dev/null || missing+=("nvm")
   else
     # The shell config guards every use of these with `command -v`, so a
