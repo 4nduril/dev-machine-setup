@@ -5,6 +5,12 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd -- "$script_dir/.." && pwd -P)"
 timestamp="$(date +%Y%m%d%H%M%S)"
 
+# "desktop" is the full setup for a graphical machine. "remote" targets
+# headless boxes (servers, cloud workspaces): no GUI configs, no coc/Node
+# tooling, and it must be rerunnable without prompts.
+profile="desktop"
+skipped_targets=()
+
 log() {
   printf '%s\n' "$*"
 }
@@ -16,6 +22,32 @@ warn() {
 die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+usage() {
+  log "Usage: scripts/setup [--remote]"
+  log ""
+  log "  --remote  Set up a headless box: zsh, git, editorconfig, Vim without"
+  log "            coc, agent rules. Skips kitty, fonts, Node tooling, and"
+  log "            bash configs, and hands interactive logins to zsh instead"
+  log "            of running chsh."
+}
+
+parse_args() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --remote) profile="remote" ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        die "Unknown argument: $arg"
+        ;;
+    esac
+  done
 }
 
 is_interactive() {
@@ -55,6 +87,26 @@ detect_os_family() {
 
 print_package_instructions() {
   local os_family="$1"
+
+  if [[ "$profile" == "remote" ]]; then
+    log "Required system packages (remote profile):"
+    case "$os_family" in
+      arch)
+        log "  sudo pacman -S --needed git bash vim zsh curl ca-certificates"
+        ;;
+      ubuntu)
+        log "  sudo apt update"
+        log "  sudo apt install git bash vim zsh curl ca-certificates"
+        ;;
+      *)
+        log "  Unsupported distro family. Install equivalent packages for:"
+        log "  git bash vim zsh curl ca-certificates"
+        ;;
+    esac
+    log "  Optional (the shell config picks them up when present):"
+    log "  ripgrep fzf bat lsd zoxide"
+    return 0
+  fi
 
   log "Required system packages:"
   case "$os_family" in
@@ -102,24 +154,41 @@ load_nvm() {
 
 check_requirements() {
   local missing=()
+  local optional_missing=()
 
   command -v git > /dev/null 2>&1 || missing+=("git")
   command -v bash > /dev/null 2>&1 || missing+=("bash")
   command -v vim > /dev/null 2>&1 || missing+=("vim")
   command -v zsh > /dev/null 2>&1 || missing+=("zsh")
-  command -v kitty > /dev/null 2>&1 || missing+=("kitty")
-  command -v rg > /dev/null 2>&1 || missing+=("ripgrep/rg")
-  command -v fzf > /dev/null 2>&1 || missing+=("fzf")
-  command -v bat > /dev/null 2>&1 || command -v batcat > /dev/null 2>&1 || missing+=("bat/batcat")
-  command -v lsd > /dev/null 2>&1 || missing+=("lsd")
-  command -v zoxide > /dev/null 2>&1 || missing+=("zoxide")
-  command -v fc-cache > /dev/null 2>&1 || missing+=("fontconfig/fc-cache")
-  command -v ssh-agent > /dev/null 2>&1 || missing+=("openssh/ssh-agent")
-  command -v pgrep > /dev/null 2>&1 || missing+=("procps/pgrep")
   command -v curl > /dev/null 2>&1 || missing+=("curl")
-  command -v corepack > /dev/null 2>&1 || missing+=("corepack")
-  has_zsh_autosuggestions || missing+=("zsh-autosuggestions")
-  find_nvm_source > /dev/null || missing+=("nvm")
+
+  if [[ "$profile" == "desktop" ]]; then
+    command -v kitty > /dev/null 2>&1 || missing+=("kitty")
+    command -v rg > /dev/null 2>&1 || missing+=("ripgrep/rg")
+    command -v fzf > /dev/null 2>&1 || missing+=("fzf")
+    command -v bat > /dev/null 2>&1 || command -v batcat > /dev/null 2>&1 || missing+=("bat/batcat")
+    command -v lsd > /dev/null 2>&1 || missing+=("lsd")
+    command -v zoxide > /dev/null 2>&1 || missing+=("zoxide")
+    command -v fc-cache > /dev/null 2>&1 || missing+=("fontconfig/fc-cache")
+    command -v ssh-agent > /dev/null 2>&1 || missing+=("openssh/ssh-agent")
+    command -v pgrep > /dev/null 2>&1 || missing+=("procps/pgrep")
+    command -v corepack > /dev/null 2>&1 || missing+=("corepack")
+    has_zsh_autosuggestions || missing+=("zsh-autosuggestions")
+    find_nvm_source > /dev/null || missing+=("nvm")
+  else
+    # The shell config guards every use of these with `command -v`, so a
+    # remote box works without them, just with fewer comforts.
+    command -v rg > /dev/null 2>&1 || optional_missing+=("ripgrep/rg")
+    command -v fzf > /dev/null 2>&1 || optional_missing+=("fzf")
+    command -v bat > /dev/null 2>&1 || command -v batcat > /dev/null 2>&1 || optional_missing+=("bat/batcat")
+    command -v lsd > /dev/null 2>&1 || optional_missing+=("lsd")
+    command -v zoxide > /dev/null 2>&1 || optional_missing+=("zoxide")
+  fi
+
+  if ((${#optional_missing[@]})); then
+    warn "Missing optional tools (setup continues without them):"
+    printf '  - %s\n' "${optional_missing[@]}" >&2
+  fi
 
   if ((${#missing[@]})); then
     warn "Missing required tools or integrations:"
@@ -128,6 +197,27 @@ check_requirements() {
     print_package_instructions "$(detect_os_family)" >&2
     exit 1
   fi
+}
+
+init_submodules() {
+  if [[ "$profile" == "desktop" ]]; then
+    git -C "$repo_root" submodule update --init --recursive
+    return 0
+  fi
+
+  # Remote: native Vim plugins and the zsh plugin only. coc.nvim needs Node
+  # plus per-machine extensions, and the opt/ plugins back desktop-only
+  # features (Copilot, LaTeX).
+  local -a paths
+  mapfile -t paths < <(
+    git config -f "$repo_root/.gitmodules" --get-regexp '^submodule\..*\.path$' |
+      awk '{print $2}' |
+      grep -v -e 'coc\.nvim' -e 'pack/plugins/opt/'
+  )
+  # An empty list would make `git submodule update` fall through to
+  # initializing every submodule, including the excluded ones.
+  ((${#paths[@]})) || die "Found no submodule paths for the remote profile in .gitmodules"
+  git -C "$repo_root" submodule update --init --recursive "${paths[@]}"
 }
 
 install_font() {
@@ -177,6 +267,14 @@ link_config() {
       return 0
     fi
 
+    # Without a prompt there is no consent to replace, and dying would leave
+    # an automated run half-applied. Skip, continue, report at the end.
+    if ! is_interactive; then
+      warn "Skipping $target: exists and is not managed by this repo."
+      skipped_targets+=("$target")
+      return 0
+    fi
+
     if confirm "Replace existing $target? It will be backed up first."; then
       backup_path "$target"
     else
@@ -192,18 +290,28 @@ deploy_configs() {
   local manifest=(
     "$repo_root/config/zsh/.zshrc|$HOME/.zshrc"
     "$repo_root/config/zsh/.zshenv|$HOME/.zshenv"
-    "$repo_root/config/bash/.bashrc|$HOME/.bashrc"
     "$repo_root/config/git/.gitconfig|$HOME/.gitconfig"
     "$repo_root/config/editorconfig/.editorconfig|$HOME/.editorconfig"
-    "$repo_root/config/kitty/kitty.conf|$HOME/.config/kitty/kitty.conf"
-    "$repo_root/config/kitty/current-theme.conf|$HOME/.config/kitty/current-theme.conf"
     "$repo_root/config/vim/.vimrc|$HOME/.vimrc"
     "$repo_root/config/vim/.vim|$HOME/.vim"
-    "$repo_root/config/eslint/eslint.config.mts|$HOME/eslint.config.mts"
-    "$repo_root/config/typescript/tsconfig.json|$HOME/tsconfig.json"
     "$repo_root/config/agents/AGENTS.md|$HOME/.codex/AGENTS.md"
     "$repo_root/config/agents/AGENTS.md|$HOME/.claude/CLAUDE.md"
   )
+
+  # The bash config is desktop-only on purpose: remote boxes typically get a
+  # provisioned ~/.bashrc (PATH, tool activation, tokens) that must keep
+  # working, so the remote profile leaves bash alone apart from the login
+  # hand-off to zsh.
+  if [[ "$profile" == "desktop" ]]; then
+    manifest+=(
+      "$repo_root/config/bash/.bashrc|$HOME/.bashrc"
+      "$repo_root/config/kitty/kitty.conf|$HOME/.config/kitty/kitty.conf"
+      "$repo_root/config/kitty/current-theme.conf|$HOME/.config/kitty/current-theme.conf"
+      "$repo_root/config/eslint/eslint.config.mts|$HOME/eslint.config.mts"
+      "$repo_root/config/typescript/tsconfig.json|$HOME/tsconfig.json"
+    )
+  fi
+
   local entry
   local source
   local target
@@ -214,10 +322,12 @@ deploy_configs() {
     link_config "$source" "$target"
   done
 
-  mkdir -p "$HOME/.config/kitty"
-  if [[ ! -e "$HOME/.config/kitty/local.conf" ]]; then
-    : > "$HOME/.config/kitty/local.conf"
-    log "Created empty Kitty local override: $HOME/.config/kitty/local.conf"
+  if [[ "$profile" == "desktop" ]]; then
+    mkdir -p "$HOME/.config/kitty"
+    if [[ ! -e "$HOME/.config/kitty/local.conf" ]]; then
+      : > "$HOME/.config/kitty/local.conf"
+      log "Created empty Kitty local override: $HOME/.config/kitty/local.conf"
+    fi
   fi
 }
 
@@ -386,25 +496,84 @@ change_default_shell() {
   chsh -s "$zsh_path"
 }
 
+# The remote replacement for chsh: chsh wants a password, and on boxes that
+# are rebuilt from an image /etc/passwd resets anyway. An exec block in the
+# login profile survives both. Interactive-only, so `ssh host command` and
+# provisioning scripts keep running under the login shell.
+install_login_shell_handoff() {
+  local target
+
+  if [[ -f "$HOME/.bash_profile" ]]; then
+    target="$HOME/.bash_profile"
+  elif [[ -f "$HOME/.profile" ]]; then
+    target="$HOME/.profile"
+  else
+    target="$HOME/.bash_profile"
+    printf '[ -f ~/.bashrc ] && . ~/.bashrc\n' > "$target"
+    log "Created $target"
+  fi
+
+  if grep -q 'dev-machine-setup: exec zsh' "$target" 2> /dev/null; then
+    log "Login shell hand-off already present in $target"
+    return 0
+  fi
+
+  cat >> "$target" << 'EOF'
+
+# dev-machine-setup: exec zsh for interactive logins.
+case $- in *i*)
+  if command -v zsh > /dev/null 2>&1; then
+    SHELL="$(command -v zsh)"
+    export SHELL
+    exec zsh -l
+  fi
+  ;;
+esac
+EOF
+  log "Added zsh hand-off for interactive logins to $target"
+}
+
+report_skipped_targets() {
+  ((${#skipped_targets[@]})) || return 0
+
+  warn "Left untouched because they already exist:"
+  printf '  - %s\n' "${skipped_targets[@]}" >&2
+  warn "Rerun interactively to review and replace them."
+}
+
 main() {
   local os_family
+
+  parse_args "$@"
   os_family="$(detect_os_family)"
 
+  log "Profile: $profile"
   log "Detected OS family: $os_family"
   print_package_instructions "$os_family"
   check_requirements
 
-  git -C "$repo_root" submodule update --init --recursive
-  install_font
+  init_submodules
   deploy_configs
-  deploy_bin
   write_git_identity
-  write_npm_identity
-  setup_node
-  change_default_shell
+
+  if [[ "$profile" == "desktop" ]]; then
+    install_font
+    deploy_bin
+    write_npm_identity
+    setup_node
+    change_default_shell
+  else
+    install_login_shell_handoff
+  fi
+
+  report_skipped_targets
 
   log "Setup complete."
-  log "Restart your terminal session or log out and back in if the default shell changed."
+  if [[ "$profile" == "desktop" ]]; then
+    log "Restart your terminal session or log out and back in if the default shell changed."
+  else
+    log "The next interactive login continues in zsh."
+  fi
 }
 
 main "$@"
