@@ -122,10 +122,12 @@ zsh-autosuggestions is available as a repo submodule
 (`config/zsh/plugins/zsh-autosuggestions`), so it needs no system package;
 the Zsh config prefers a system installation when one exists.
 
-The remote profile runs unattended: no prompts, rerunnable, and existing
-files it does not manage are left in place. Machine-specific initialization
-(for example activating a tool manager) belongs in `~/.zshrc.local` or
-`~/.zshenv.local`.
+Non-interactive remote runs are prompt-free and rerunnable: existing files
+the repo does not manage are skipped with a warning and reported at the end.
+Interactive runs prompt for the Git identity and before replacing an
+existing file, which is the way to review and adopt skipped files.
+Machine-specific initialization (for example activating a tool manager)
+belongs in `~/.zshrc.local` or `~/.zshenv.local`.
 
 ## Layout
 
