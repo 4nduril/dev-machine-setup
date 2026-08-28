@@ -94,8 +94,8 @@ The desktop setup:
 
 The script is intended to be rerunnable. Existing config files are not
 overwritten silently: interactive runs ask before backing up and replacing a
-file, non-interactive runs skip it with a warning and report the skipped
-files at the end.
+file, and declining keeps the file and continues; non-interactive runs skip
+it with a warning. Skipped files are reported at the end.
 
 ## Remote boxes
 
