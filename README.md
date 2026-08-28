@@ -2,6 +2,11 @@
 
 Personal Linux development machine setup.
 
+The setup script has two profiles: **desktop** (the default) covers a
+graphical machine including Kitty, fonts, and the coc-based Vim IDE setup.
+**remote** (`--remote`) covers headless boxes such as servers and cloud
+workspaces; see [Remote boxes](#remote-boxes).
+
 This repo manages:
 
 - Vim
@@ -38,10 +43,10 @@ clean include mechanism as Git.
 ## Requirements
 
 Install system packages manually before running setup. The script prints the
-current package list for the detected distro and stops if required tools are
-missing.
+current package list for the detected distro and profile and stops if
+required tools are missing.
 
-Arch / Manjaro:
+For the desktop profile, Arch / Manjaro:
 
 ```bash
 sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm
@@ -58,18 +63,23 @@ Install `nvm` separately on Ubuntu before rerunning setup. On some Ubuntu
 releases, the `bat` package exposes `batcat`; the shell config handles either
 command.
 
+The remote profile requires only `git bash vim zsh curl ca-certificates`.
+`ripgrep fzf bat lsd zoxide` are optional there; the shell config picks them
+up when present.
+
 ## Setup
 
 ```bash
 git clone <repo-url> dev-machine-setup
 cd dev-machine-setup
-./scripts/setup
+./scripts/setup            # desktop machine
+./scripts/setup --remote   # headless box
 ```
 
-The setup script:
+The desktop setup:
 
 1. checks required tools
-2. initializes Vim plugin submodules
+2. initializes all plugin submodules
 3. installs the Nerd Font into `~/.local/share/fonts/dev-machine-setup`
 4. refreshes the font cache
 5. symlinks managed configs
@@ -80,7 +90,39 @@ The setup script:
 10. changes the default shell to Zsh
 
 The script is intended to be rerunnable. Existing config files are not
-overwritten silently.
+overwritten silently: interactive runs ask before backing up and replacing a
+file, non-interactive runs skip it with a warning and report the skipped
+files at the end.
+
+## Remote boxes
+
+`./scripts/setup --remote` deploys the Zsh, Git, EditorConfig, Vim, and
+agent-rules configs, and skips everything tied to a graphical machine or to
+this repo's Node tooling: Kitty, the Nerd Font, the home ESLint/TypeScript
+defaults, the ox LSP wrappers, npm author defaults, and the Node/nvm step.
+Node on a remote box is the box's own concern (version manager, system
+package, or nothing).
+
+Vim plugin submodules are initialized without `coc.nvim` and without the
+`opt/` plugins, so Vim runs as a plain native-package setup. The coc mappings
+load only when the coc.nvim checkout is present, so the same vimrc serves
+both profiles.
+
+The remote profile does not touch `~/.bashrc`, because remote boxes usually
+provision it themselves (PATH entries, tool activation, tokens). Instead of
+`chsh`, which prompts for a password and does not survive boxes rebuilt from
+an image, it appends a guarded block to the login profile that hands
+interactive logins over to zsh. Non-interactive SSH commands keep running
+under the login shell.
+
+zsh-autosuggestions is available as a repo submodule
+(`config/zsh/plugins/zsh-autosuggestions`), so it needs no system package;
+the Zsh config prefers a system installation when one exists.
+
+The remote profile runs unattended: no prompts, rerunnable, and existing
+files it does not manage are left in place. Machine-specific initialization
+(for example activating a tool manager) belongs in `~/.zshrc.local` or
+`~/.zshenv.local`.
 
 ## Layout
 
