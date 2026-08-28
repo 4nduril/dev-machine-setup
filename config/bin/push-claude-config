@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Push the local Claude Code user config to remote boxes over SSH: the
+# global ~/.claude/CLAUDE.md and the ~/.claude/rules/ directory. This
+# machine is the source of truth; rules/ is mirrored, so rules that only
+# exist on the target are removed. The target's other ~/.claude content
+# (settings, sessions, skills) is not touched.
+set -euo pipefail
+
+usage() {
+  printf 'Usage: push-claude-config [-n] <ssh-host> [<ssh-host>...]\n'
+  printf '\n'
+  printf '  -n, --dry-run  Show what would change without transferring.\n'
+}
+
+dry_run=()
+hosts=()
+for arg in "$@"; do
+  case "$arg" in
+    -n | --dry-run) dry_run=(--dry-run) ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      usage >&2
+      printf 'error: unknown option: %s\n' "$arg" >&2
+      exit 1
+      ;;
+    *) hosts+=("$arg") ;;
+  esac
+done
+
+if ((${#hosts[@]} == 0)); then
+  usage >&2
+  exit 1
+fi
+
+for host in "${hosts[@]}"; do
+  printf '==> %s\n' "$host"
+  if ((${#dry_run[@]} == 0)); then
+    ssh "$host" 'mkdir -p ~/.claude/rules'
+  fi
+  rsync "${dry_run[@]}" -ai "$HOME/.claude/CLAUDE.md" "$host:.claude/CLAUDE.md"
+  rsync "${dry_run[@]}" -ai --delete "$HOME/.claude/rules/" "$host:.claude/rules/"
+done
