@@ -278,7 +278,9 @@ link_config() {
     if confirm "Replace existing $target? It will be backed up first."; then
       backup_path "$target"
     else
-      die "Refusing to overwrite existing $target"
+      warn "Keeping $target as it is."
+      skipped_targets+=("$target")
+      return 0
     fi
   fi
 
@@ -543,7 +545,9 @@ report_skipped_targets() {
 
   warn "Left untouched because they already exist:"
   printf '  - %s\n' "${skipped_targets[@]}" >&2
-  warn "Rerun interactively to review and replace them."
+  if ! is_interactive; then
+    warn "Rerun interactively to review and replace them."
+  fi
 }
 
 main() {
