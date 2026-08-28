@@ -68,10 +68,13 @@ setopt prompt_subst
 PROMPT="%m|%{$fg[cyan]%}%80<…<%~%<<"$'\n$(git_prompt_info)'"%(?.%F{white}.%F{red})%#%{$reset_color%} "
 RPROMPT="%{$fg[cyan]%}%*%{$reset_color%}"
 
-# Auto-suggest
+# Auto-suggest. The system package is preferred; the repo submodule next to
+# this file covers machines without one. `%x` is the file being sourced
+# (~/.zshrc), `:A` resolves the symlink into the repo checkout.
 for autosuggest_source in \
   /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh \
-  /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh; do
+  /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh \
+  "${${(%):-%x}:A:h}/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh"; do
   if [[ -r "$autosuggest_source" ]]; then
     source "$autosuggest_source"
     ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
