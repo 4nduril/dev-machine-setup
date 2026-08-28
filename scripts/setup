@@ -503,8 +503,13 @@ change_default_shell() {
 install_login_shell_handoff() {
   local target
 
+  # Bash reads the first existing file of .bash_profile, .bash_login,
+  # .profile and stops, so the block must land in the file bash will
+  # actually read.
   if [[ -f "$HOME/.bash_profile" ]]; then
     target="$HOME/.bash_profile"
+  elif [[ -f "$HOME/.bash_login" ]]; then
+    target="$HOME/.bash_login"
   elif [[ -f "$HOME/.profile" ]]; then
     target="$HOME/.profile"
   else
