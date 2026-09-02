@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Restart the T3 Code server on remote boxes reached by the desktop app's SSH
+# launch, so it comes up at the version the desktop app pins.
+#
+# The launcher pins the server version to the desktop app's, but it decides on
+# every launch whether it owns the server by probing the port: anything already
+# listening is classified `external` and is then never stopped or replaced. So
+# a server that outlives a desktop app update keeps serving the old version,
+# and the app can only ask for a manual update. Killing the process is the
+# whole fix. The launcher notices within seconds, starts a replacement at the
+# pinned version, and records it as its own.
+#
+# Do not run this from a terminal hosted by the server being restarted; that
+# shell is a child of it. Run it from the desktop.
+set -euo pipefail
+
+usage() {
+  printf 'Usage: t3-remote-restart <ssh-host> [<ssh-host>...]\n'
+  printf '\n'
+  printf 'Restarts the SSH-launched T3 Code server so it comes up at the\n'
+  printf 'version the desktop app pins. Prints the version it came up as.\n'
+}
+
+hosts=()
+for arg in "$@"; do
+  case "$arg" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      usage >&2
+      printf 'error: unknown option: %s\n' "$arg" >&2
+      exit 1
+      ;;
+    *) hosts+=("$arg") ;;
+  esac
+done
+
+if ((${#hosts[@]} == 0)); then
+  usage >&2
+  exit 1
+fi
+
+# The remote half runs from a quoted heredoc, so nothing in it expands locally.
+# It is one script rather than several SSH calls so the wait happens next to
+# the process it watches, and it holds its own pattern so that neither the SSH
+# command line nor this script's own process can match it.
+status=0
+for host in "${hosts[@]}"; do
+  printf '==> %s\n' "$host"
+  ssh "$host" sh -s << 'REMOTE' || status=1
+set -eu
+
+pattern='node .*/node_modules/\.bin/t3 serve'
+wait_seconds=60
+
+# pgrep exits 1 when nothing matches, and head makes that the pipeline's
+# success, so this reports "no server" as empty output rather than failing.
+server_pid() { pgrep -f "$pattern" | head -1; }
+
+# The npx cache directory in the command line holds the package, so the version
+# comes from its manifest rather than a hardcoded lookup.
+server_version() {
+  bin_path=$(tr '\0' '\n' < "/proc/$1/cmdline" 2>/dev/null | sed -n 2p) || return 0
+  manifest="${bin_path%/node_modules/.bin/t3}/node_modules/t3/package.json"
+  [ -r "$manifest" ] || return 0
+  sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" | head -1
+}
+
+describe() { echo "${1:-unknown}"; }
+
+old_pid=$(server_pid)
+if [ -z "$old_pid" ]; then
+  echo 'no T3 Code server running; nothing to restart'
+  exit 0
+fi
+
+echo "stopping $old_pid (version $(describe "$(server_version "$old_pid")"))"
+kill "$old_pid" 2>/dev/null || true
+
+waited=0
+while [ "$waited" -lt "$wait_seconds" ]; do
+  sleep 2
+  waited=$((waited + 2))
+  new_pid=$(server_pid)
+  if [ -n "$new_pid" ] && [ "$new_pid" != "$old_pid" ]; then
+    echo "started $new_pid (version $(describe "$(server_version "$new_pid")"))"
+    exit 0
+  fi
+done
+
+echo "no replacement server after ${wait_seconds}s; reconnect the environment in the desktop app" >&2
+exit 1
+REMOTE
+done
+exit "$status"
