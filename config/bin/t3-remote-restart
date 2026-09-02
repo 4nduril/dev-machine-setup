@@ -15,26 +15,41 @@
 set -euo pipefail
 
 usage() {
-  printf 'Usage: t3-remote-restart <ssh-host> [<ssh-host>...]\n'
+  printf 'Usage: t3-remote-restart [--port <port>] <ssh-host> [<ssh-host>...]\n'
   printf '\n'
   printf 'Restarts the SSH-launched T3 Code server so it comes up at the\n'
   printf 'version the desktop app pins. Prints the version it came up as.\n'
+  printf '\n'
+  printf '  --port <port>  Restart the server on this port. Needed only when a\n'
+  printf '                 host runs several T3 Code servers, which the script\n'
+  printf '                 otherwise refuses to guess between.\n'
 }
 
+port=""
 hosts=()
-for arg in "$@"; do
-  case "$arg" in
+while (($#)); do
+  case "$1" in
+    --port)
+      shift
+      port="${1-}"
+      if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+        usage >&2
+        printf 'error: --port needs a port number\n' >&2
+        exit 1
+      fi
+      ;;
     -h | --help)
       usage
       exit 0
       ;;
     -*)
       usage >&2
-      printf 'error: unknown option: %s\n' "$arg" >&2
+      printf 'error: unknown option: %s\n' "$1" >&2
       exit 1
       ;;
-    *) hosts+=("$arg") ;;
+    *) hosts+=("$1") ;;
   esac
+  shift
 done
 
 if ((${#hosts[@]} == 0)); then
@@ -43,21 +58,40 @@ if ((${#hosts[@]} == 0)); then
 fi
 
 # The remote half runs from a quoted heredoc, so nothing in it expands locally.
-# It is one script rather than several SSH calls so the wait happens next to
-# the process it watches, and it holds its own pattern so that neither the SSH
-# command line nor this script's own process can match it.
+# It is one script rather than several SSH calls so the waiting happens next to
+# the process it watches, and it holds its own process pattern so that neither
+# the SSH command line nor this script itself can match it.
 status=0
 for host in "${hosts[@]}"; do
   printf '==> %s\n' "$host"
-  ssh "$host" sh -s << 'REMOTE' || status=1
+  # shellcheck disable=SC2029  # $port is a local value, deliberately expanded here
+  ssh "$host" "sh -s -- '$port'" << 'REMOTE' || status=1
 set -eu
 
-pattern='node .*/node_modules/\.bin/t3 serve'
-wait_seconds=60
+port="${1:-}"
+exit_seconds=20
+start_seconds=60
 
-# pgrep exits 1 when nothing matches, and head makes that the pipeline's
-# success, so this reports "no server" as empty output rather than failing.
-server_pid() { pgrep -f "$pattern" | head -1; }
+# A host can run more than one T3 Code server: a second one from a bare
+# `npx t3@<version>` start, or a dev server for a worktree with its own
+# base directory. Two servers cannot share a port, so the port is the
+# identity. The launcher's `pid` file cannot serve as one, because it is
+# absent in exactly the state this script exists to fix, and it names the
+# runner wrapper rather than the server anyway. Its `port` file survives.
+if [ -z "$port" ]; then
+  set -- "$HOME"/.t3/ssh-launch/*/port
+  if [ "$#" -eq 1 ] && [ -r "$1" ]; then
+    port=$(cat "$1")
+  fi
+fi
+
+pattern='node .*/node_modules/\.bin/t3 serve'
+if [ -n "$port" ]; then
+  pattern="$pattern.*--port $port"'([[:space:]]|$)'
+fi
+
+matching_pids() { pgrep -f "$pattern" 2>/dev/null || true; }
+count_of() { printf '%s' "$1" | grep -c . || true; }
 
 # The npx cache directory in the command line holds the package, so the version
 # comes from its manifest rather than a hardcoded lookup.
@@ -68,29 +102,51 @@ server_version() {
   sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" | head -1
 }
 
-describe() { echo "${1:-unknown}"; }
+describe_version() { echo "${1:-unknown version}"; }
 
-old_pid=$(server_pid)
-if [ -z "$old_pid" ]; then
+pids=$(matching_pids)
+found=$(count_of "$pids")
+
+if [ "$found" -eq 0 ]; then
   echo 'no T3 Code server running; nothing to restart'
   exit 0
 fi
 
-echo "stopping $old_pid (version $(describe "$(server_version "$old_pid")"))"
+# Refuse rather than pick one, so an unrelated server cannot be stopped and a
+# pre-existing one reported as the replacement.
+if [ "$found" -gt 1 ]; then
+  echo "$found T3 Code servers match; rerun with --port to choose one:" >&2
+  pgrep -af "$pattern" >&2
+  exit 1
+fi
+
+old_pid=$pids
+echo "stopping $old_pid ($(describe_version "$(server_version "$old_pid")"))"
 kill "$old_pid" 2>/dev/null || true
 
+# Wait for it to be gone before looking for a replacement, so a server that
+# ignores the signal cannot be mistaken for a restarted one.
 waited=0
-while [ "$waited" -lt "$wait_seconds" ]; do
-  sleep 2
-  waited=$((waited + 2))
-  new_pid=$(server_pid)
-  if [ -n "$new_pid" ] && [ "$new_pid" != "$old_pid" ]; then
-    echo "started $new_pid (version $(describe "$(server_version "$new_pid")"))"
-    exit 0
+while kill -0 "$old_pid" 2>/dev/null; do
+  if [ "$waited" -ge "$exit_seconds" ]; then
+    echo "server $old_pid did not exit after ${exit_seconds}s" >&2
+    exit 1
   fi
+  sleep 1
+  waited=$((waited + 1))
 done
 
-echo "no replacement server after ${wait_seconds}s; reconnect the environment in the desktop app" >&2
+waited=0
+while [ "$waited" -lt "$start_seconds" ]; do
+  sleep 2
+  waited=$((waited + 2))
+  pids=$(matching_pids)
+  [ "$(count_of "$pids")" -eq 1 ] || continue
+  echo "started $pids ($(describe_version "$(server_version "$pids")"))"
+  exit 0
+done
+
+echo "no replacement server after ${start_seconds}s; reconnect the environment in the desktop app" >&2
 exit 1
 REMOTE
 done
