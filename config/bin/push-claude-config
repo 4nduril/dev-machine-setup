@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # Push the local Claude Code user config to remote boxes over SSH: the
-# global ~/.claude/CLAUDE.md and the ~/.claude/rules/ directory. This
-# machine is the source of truth; rules/ is mirrored, so rules that only
-# exist on the target are removed. The target's other ~/.claude content
-# (settings, sessions, skills) is not touched.
+# global ~/.claude/CLAUDE.md, plus the ~/.claude/rules/ and ~/.claude/skills/
+# directories. This machine is the source of truth; both directories are
+# mirrored, so entries that only exist on the target are removed. The
+# target's other ~/.claude content (settings, sessions, projects, plugins)
+# is not touched.
+#
+# Mirroring makes this the only writer of those two directories on a target.
+# Anything else that populates them, such as a Coder dotfiles layer
+# symlinking users/<login>/claude/skills/ into ~/.claude/skills/, will have
+# its entries deleted here. Pick one mechanism per directory.
 set -euo pipefail
 
 usage() {
@@ -38,8 +44,9 @@ fi
 for host in "${hosts[@]}"; do
   printf '==> %s\n' "$host"
   if ((${#dry_run[@]} == 0)); then
-    ssh "$host" 'mkdir -p ~/.claude/rules'
+    ssh "$host" 'mkdir -p ~/.claude/rules ~/.claude/skills'
   fi
   rsync "${dry_run[@]}" -ai "$HOME/.claude/CLAUDE.md" "$host:.claude/CLAUDE.md"
   rsync "${dry_run[@]}" -ai --delete "$HOME/.claude/rules/" "$host:.claude/rules/"
+  rsync "${dry_run[@]}" -ai --delete "$HOME/.claude/skills/" "$host:.claude/skills/"
 done

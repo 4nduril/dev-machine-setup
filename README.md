@@ -16,9 +16,10 @@ This repo manages:
 - Git defaults
 - EditorConfig, ESLint, and TypeScript home defaults
 - shared coding-agent rules for Claude Code and Codex
-- a `push-claude-config` script that syncs the local `~/.claude/CLAUDE.md`
-  and `~/.claude/rules/` to remote boxes over SSH (deployed by the desktop
-  profile; the private config itself is not part of this repo)
+- a `push-claude-config` script that syncs the local `~/.claude/CLAUDE.md`,
+  `~/.claude/rules/` and `~/.claude/skills/` to remote boxes over SSH
+  (deployed by the desktop profile; the private config itself is not part of
+  this repo)
 - project-copyable templates
 - the Literation Mono Nerd Font used for terminal/editor icons
 - a Bash setup script for symlinking configs and bootstrapping user-space tools
