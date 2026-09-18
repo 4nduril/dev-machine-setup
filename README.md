@@ -20,6 +20,10 @@ This repo manages:
   `~/.claude/rules/` and `~/.claude/skills/` to remote boxes over SSH
   (deployed by the desktop profile; the private config itself is not part of
   this repo)
+- a `bootstrap-worktree` script that makes a freshly created git worktree
+  runnable, by copying the gitignored files the app needs from the main clone
+  and installing the pinned tools and dependencies (deployed by the desktop
+  profile; on remote boxes call it by its path in this repo)
 - project-copyable templates
 - the Literation Mono Nerd Font used for terminal/editor icons
 - a Bash setup script for symlinking configs and bootstrapping user-space tools
