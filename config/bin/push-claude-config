@@ -10,6 +10,13 @@
 # Anything else that populates them, such as a Coder dotfiles layer
 # symlinking users/<login>/claude/skills/ into ~/.claude/skills/, will have
 # its entries deleted here. Pick one mechanism per directory.
+#
+# `skills/synced/` is the exception and stays excluded. Claude Code downloads
+# the account's own skill bundle there on every machine it runs on, so pushing
+# it would mean two writers for one tree: the copies differ per machine, rsync
+# resends them on every run, and --delete removes a bundle the target fetched
+# under a different id. Excluded paths are also protected from --delete, so a
+# target keeps whatever it downloaded for itself.
 set -euo pipefail
 
 usage() {
@@ -48,5 +55,5 @@ for host in "${hosts[@]}"; do
   fi
   rsync "${dry_run[@]}" -ai "$HOME/.claude/CLAUDE.md" "$host:.claude/CLAUDE.md"
   rsync "${dry_run[@]}" -ai --delete "$HOME/.claude/rules/" "$host:.claude/rules/"
-  rsync "${dry_run[@]}" -ai --delete "$HOME/.claude/skills/" "$host:.claude/skills/"
+  rsync "${dry_run[@]}" -ai --delete --exclude 'synced/' "$HOME/.claude/skills/" "$host:.claude/skills/"
 done
