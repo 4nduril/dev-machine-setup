@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Make a freshly created git worktree runnable: copy the gitignored files the
+# app needs from the main clone, then install the pinned tools and the
+# dependencies.
+#
+# `git worktree add` checks out tracked files only, so a new worktree has no
+# `.env.local`, no auth state and no `node_modules`. Everything here is derived
+# from git, so the script takes no arguments and works in any repo: T3 Code runs
+# it as a `runOnWorktreeCreate` project script, and it is equally fine by hand.
+#
+# Running it in a main clone is a no-op, so it is safe to wire up per project
+# rather than per worktree.
+set -euo pipefail
+
+# Files git does not carry but a local run needs. Missing entries are skipped,
+# so one list covers every repo.
+COPY_PATHS=(
+  .env.local
+  .npmrc.local
+  e2e/.env
+  e2e/.auth
+)
+
+warn() { printf 'bootstrap-worktree: %s\n' "$1" >&2; }
+
+worktree=$(git rev-parse --show-toplevel)
+# In a linked worktree the common git dir is the main clone's `.git`; in the
+# main clone it is that clone's own. Comparing the two is what detects a
+# worktree, without parsing `git worktree list`.
+main_clone=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+
+if [[ "$main_clone" == "$worktree" ]]; then
+  echo "Not a linked worktree, nothing to bootstrap."
+  exit 0
+fi
+
+echo "Bootstrapping $worktree from $main_clone"
+
+for path in "${COPY_PATHS[@]}"; do
+  [[ -e "$main_clone/$path" ]] || continue
+  mkdir -p "$(dirname "$worktree/$path")"
+  cp -R "$main_clone/$path" "$worktree/$path"
+  echo "  copied $path"
+done
+
+cd "$worktree"
+
+# Tools first: mise resolves them per directory, so the pinned node/pnpm of this
+# worktree are not in place until this runs here.
+if command -v mise > /dev/null; then
+  mise install || warn "mise install failed; continuing with the tools on PATH"
+fi
+
+if [[ -f pnpm-lock.yaml ]]; then
+  pnpm install --frozen-lockfile
+elif [[ -f yarn.lock ]]; then
+  yarn install --immutable
+elif [[ -f package-lock.json ]]; then
+  npm ci
+elif [[ -f uv.lock ]]; then
+  uv sync
+else
+  echo "No lockfile found, skipping dependency install."
+fi
+
+echo "Worktree ready."
