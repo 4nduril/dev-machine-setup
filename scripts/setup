@@ -103,25 +103,25 @@ print_package_instructions() {
         log "  git bash vim zsh curl ca-certificates"
         ;;
     esac
-    log "  Optional (the shell config picks them up when present):"
-    log "  ripgrep fzf bat lsd zoxide"
+    log "  Optional (setup runs without them):"
+    log "  ripgrep fzf bat lsd zoxide btop"
     return 0
   fi
 
   log "Required system packages:"
   case "$os_family" in
     arch)
-      log "  sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm"
+      log "  sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm"
       ;;
     ubuntu)
       log "  sudo apt update"
-      log "  sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions"
+      log "  sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions"
       log "  Install nvm separately before rerunning setup."
       log "  On some Ubuntu releases, the bat package provides the command as batcat; the shell config handles that."
       ;;
     *)
       log "  Unsupported distro family. Install equivalent packages for:"
-      log "  git bash vim zsh kitty ripgrep fzf bat lsd zoxide fontconfig openssh/procps curl ca-certificates zsh-autosuggestions nvm"
+      log "  git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh/procps curl ca-certificates zsh-autosuggestions nvm"
       ;;
   esac
 }
@@ -164,19 +164,21 @@ check_requirements() {
     command -v bat > /dev/null 2>&1 || command -v batcat > /dev/null 2>&1 || missing+=("bat/batcat")
     command -v lsd > /dev/null 2>&1 || missing+=("lsd")
     command -v zoxide > /dev/null 2>&1 || missing+=("zoxide")
+    command -v btop > /dev/null 2>&1 || missing+=("btop")
     command -v fc-cache > /dev/null 2>&1 || missing+=("fontconfig/fc-cache")
     command -v ssh-agent > /dev/null 2>&1 || missing+=("openssh/ssh-agent")
     command -v pgrep > /dev/null 2>&1 || missing+=("procps/pgrep")
     command -v corepack > /dev/null 2>&1 || missing+=("corepack")
     find_nvm_source > /dev/null || missing+=("nvm")
   else
-    # The shell config guards every use of these with `command -v`, so a
-    # remote box works without them, just with fewer comforts.
+    # Nothing this repo deploys depends on these, so a remote box works
+    # without them, just with fewer comforts.
     command -v rg > /dev/null 2>&1 || optional_missing+=("ripgrep/rg")
     command -v fzf > /dev/null 2>&1 || optional_missing+=("fzf")
     command -v bat > /dev/null 2>&1 || command -v batcat > /dev/null 2>&1 || optional_missing+=("bat/batcat")
     command -v lsd > /dev/null 2>&1 || optional_missing+=("lsd")
     command -v zoxide > /dev/null 2>&1 || optional_missing+=("zoxide")
+    command -v btop > /dev/null 2>&1 || optional_missing+=("btop")
   fi
 
   if ((${#optional_missing[@]})); then
