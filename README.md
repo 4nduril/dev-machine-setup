@@ -57,14 +57,14 @@ required tools are missing.
 For the desktop profile, Arch / Manjaro:
 
 ```bash
-sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm
+sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm
 ```
 
 Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions
+sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions
 ```
 
 Install `nvm` separately on Ubuntu before rerunning setup. On some Ubuntu
@@ -72,8 +72,8 @@ releases, the `bat` package exposes `batcat`; the shell config handles either
 command.
 
 The remote profile requires only `git bash vim zsh curl ca-certificates`.
-`ripgrep fzf bat lsd zoxide` are optional there; the shell config picks them
-up when present.
+`ripgrep fzf bat lsd zoxide btop` are optional there. Setup runs without them,
+and the shell config wires up the ones it uses when they are present.
 
 ## Setup
 
