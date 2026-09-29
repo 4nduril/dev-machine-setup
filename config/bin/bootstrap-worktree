@@ -51,14 +51,25 @@ if command -v mise > /dev/null; then
   mise install || warn "mise install failed; continuing with the tools on PATH"
 fi
 
+# A non-interactive shell has no `mise activate` hook, so the tools just
+# installed are not on PATH. `mise exec` puts this directory's toolset on PATH
+# for the one command.
+with_tools() {
+  if command -v mise > /dev/null; then
+    mise exec -- "$@"
+  else
+    "$@"
+  fi
+}
+
 if [[ -f pnpm-lock.yaml ]]; then
-  pnpm install --frozen-lockfile
+  with_tools pnpm install --frozen-lockfile
 elif [[ -f yarn.lock ]]; then
-  yarn install --immutable
+  with_tools yarn install --immutable
 elif [[ -f package-lock.json ]]; then
-  npm ci
+  with_tools npm ci
 elif [[ -f uv.lock ]]; then
-  uv sync
+  with_tools uv sync
 else
   echo "No lockfile found, skipping dependency install."
 fi
