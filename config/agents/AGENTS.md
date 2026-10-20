@@ -5,7 +5,9 @@ add detail and win on conflict.
 
 ## Working Agreement
 
-- **Plan before non-trivial work.** Outline the approach and wait for approval.
+- **Plan before non-trivial implementation work.** Before making substantial
+  changes, outline the approach and wait for approval. Reviews, investigations,
+  explanations, and other read-only tasks do not require advance approval.
   Small, obvious fixes don't need a plan.
 - **Once a plan is approved, run it to completion autonomously** — implement,
   iterate against the mechanical feedback loop (types, lint, tests), commit,
