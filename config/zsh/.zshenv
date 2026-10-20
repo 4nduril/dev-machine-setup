@@ -14,6 +14,10 @@ for nvm_source in \
 done
 unset nvm_source
 
+# pnpm puts globally installed CLIs (`pnpm add -g`) under $PNPM_HOME/bin.
+export PNPM_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/pnpm"
+path=("$PNPM_HOME/bin" $path)
+
 # SSH agent. Prefer the systemd user-managed agent (socket-activated,
 # one persistent instance per login, no manual process tracking) and
 # only fall back to spawning a plain ssh-agent on systems that don't
