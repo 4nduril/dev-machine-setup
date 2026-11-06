@@ -4,7 +4,15 @@
 # directories. This machine is the source of truth; both directories are
 # mirrored, so entries that only exist on the target are removed. The
 # target's other ~/.claude content (settings, sessions, projects, plugins)
-# is not touched.
+# is not touched, with one exception below.
+#
+# From ~/.claude/settings.json only `cleanupPeriodDays` is copied, into the
+# target's settings.json, leaving every other key there as it is. Claude Code
+# deletes session transcripts older than that many days (default 30) when it
+# starts, and usage tools read token counts from those transcripts. The rest
+# of settings.json holds per-machine choices, so it is not pushed. A local
+# value of 0 is not copied, because Claude Code reads 0 as "delete every
+# transcript and stop writing new ones".
 #
 # Mirroring makes this the only writer of those two directories on a target.
 # Anything else that populates them, such as a Coder dotfiles layer
@@ -48,6 +56,38 @@ if ((${#hosts[@]} == 0)); then
   exit 1
 fi
 
+retention_days=""
+if [[ -f "$HOME/.claude/settings.json" ]]; then
+  retention_days=$(jq -r '.cleanupPeriodDays // empty' "$HOME/.claude/settings.json")
+fi
+if [[ -n "$retention_days" && ! "$retention_days" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'warning: local cleanupPeriodDays is %s, not a positive integer; not copying it\n' "$retention_days" >&2
+  retention_days=""
+fi
+
+# Runs on the target. $1 is the day count, $2 is 1 for a dry run.
+# shellcheck disable=SC2016 # expanded by the remote bash, not here
+set_retention='
+set -euo pipefail
+f="$HOME/.claude/settings.json"
+if ! command -v jq >/dev/null; then
+  printf "error: jq is not installed on the target\n" >&2
+  exit 1
+fi
+current=""
+if [[ -f "$f" ]]; then
+  current=$(jq -r ".cleanupPeriodDays // empty" "$f")
+fi
+[[ "$current" == "$1" ]] && exit 0
+printf "settings.json: cleanupPeriodDays %s -> %s\n" "${current:-unset}" "$1"
+[[ "$2" == 1 ]] && exit 0
+[[ -f "$f" ]] || printf "{}\n" >"$f"
+tmp=$(mktemp)
+jq --argjson days "$1" ".cleanupPeriodDays = \$days" "$f" >"$tmp"
+cat "$tmp" >"$f"
+rm "$tmp"
+'
+
 for host in "${hosts[@]}"; do
   printf '==> %s\n' "$host"
   if ((${#dry_run[@]} == 0)); then
@@ -56,4 +96,7 @@ for host in "${hosts[@]}"; do
   rsync "${dry_run[@]}" -ai "$HOME/.claude/CLAUDE.md" "$host:.claude/CLAUDE.md"
   rsync "${dry_run[@]}" -ai --delete "$HOME/.claude/rules/" "$host:.claude/rules/"
   rsync "${dry_run[@]}" -ai --delete --exclude 'synced/' "$HOME/.claude/skills/" "$host:.claude/skills/"
+  if [[ -n "$retention_days" ]]; then
+    ssh "$host" bash -s -- "$retention_days" "$((${#dry_run[@]} > 0 ? 1 : 0))" <<<"$set_retention"
+  fi
 done
