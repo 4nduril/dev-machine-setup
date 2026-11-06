@@ -112,21 +112,28 @@ if command -v fzf > /dev/null 2>&1; then
   alias gbDf='gb -D $(gb | fzf -m)'
 fi
 
-if command -v lsd > /dev/null 2>&1; then
-  alias ls='lsd'
-fi
 alias l='ls -al'
-alias cp='cp -i'
-alias mv='mv -i'
 alias _='sudo'
 alias ...='../..'
 alias cc='claude'
 alias cca='claude --permission-mode auto'
 
-if command -v bat > /dev/null 2>&1; then
-  alias cat='bat'
-elif command -v batcat > /dev/null 2>&1; then
-  alias cat='batcat'
+# Claude Code sets CLAUDECODE=1 and runs its commands in a shell that loads
+# these aliases. Agents expect the coreutils flags and a cp/mv that does not
+# stop to ask, so the replacements stay out of their shells.
+if [[ -z "${CLAUDECODE:-}" ]]; then
+  alias cp='cp -i'
+  alias mv='mv -i'
+
+  if command -v lsd > /dev/null 2>&1; then
+    alias ls='lsd'
+  fi
+
+  if command -v bat > /dev/null 2>&1; then
+    alias cat='bat'
+  elif command -v batcat > /dev/null 2>&1; then
+    alias cat='batcat'
+  fi
 fi
 
 # Completion
