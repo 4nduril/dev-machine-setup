@@ -17,8 +17,9 @@ This repo manages:
 - EditorConfig, ESLint, and TypeScript home defaults
 - shared coding-agent rules for Claude Code and Codex
 - a `push-claude-config` script that syncs the local `~/.claude/CLAUDE.md`,
-  `~/.claude/rules/` and `~/.claude/skills/` to remote boxes over SSH
-  (deployed by the desktop profile; the private config itself is not part of
+  `~/.claude/rules/` and `~/.claude/skills/` to remote boxes over SSH, and
+  copies the transcript retention setting `cleanupPeriodDays` into their
+  `settings.json` (deployed by the desktop profile; the private config itself is not part of
   this repo)
 - a `bootstrap-worktree` script that makes a freshly created git worktree
   runnable, by copying the gitignored files the app needs from the main clone
