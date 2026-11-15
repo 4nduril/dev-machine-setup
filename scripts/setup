@@ -104,24 +104,24 @@ print_package_instructions() {
         ;;
     esac
     log "  Optional (setup runs without them):"
-    log "  ripgrep fzf bat lsd zoxide btop"
+    log "  ripgrep fzf bat lsd zoxide btop gh (github-cli on Arch/Manjaro, or via mise)"
     return 0
   fi
 
   log "Required system packages:"
   case "$os_family" in
     arch)
-      log "  sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm"
+      log "  sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm github-cli"
       ;;
     ubuntu)
       log "  sudo apt update"
-      log "  sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions"
+      log "  sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions gh"
       log "  Install nvm separately before rerunning setup."
       log "  On some Ubuntu releases, the bat package provides the command as batcat; the shell config handles that."
       ;;
     *)
       log "  Unsupported distro family. Install equivalent packages for:"
-      log "  git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh/procps curl ca-certificates zsh-autosuggestions nvm"
+      log "  git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh/procps curl ca-certificates zsh-autosuggestions nvm gh"
       ;;
   esac
 }
@@ -147,6 +147,21 @@ load_nvm() {
   command -v nvm > /dev/null 2>&1
 }
 
+# Mirrors the gh lookup of the GitHub credential helper in
+# config/git/.gitconfig, which deliberately ignores PATH.
+find_gh() {
+  local candidate
+  for candidate in \
+    /usr/bin/gh \
+    "${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims/gh"; do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 check_requirements() {
   local missing=()
   local optional_missing=()
@@ -170,6 +185,7 @@ check_requirements() {
     command -v pgrep > /dev/null 2>&1 || missing+=("procps/pgrep")
     command -v corepack > /dev/null 2>&1 || missing+=("corepack")
     find_nvm_source > /dev/null || missing+=("nvm")
+    find_gh > /dev/null || missing+=("gh/github-cli")
   else
     # Nothing this repo deploys depends on these, so a remote box works
     # without them, just with fewer comforts.
@@ -179,6 +195,7 @@ check_requirements() {
     command -v lsd > /dev/null 2>&1 || optional_missing+=("lsd")
     command -v zoxide > /dev/null 2>&1 || optional_missing+=("zoxide")
     command -v btop > /dev/null 2>&1 || optional_missing+=("btop")
+    find_gh > /dev/null || optional_missing+=("gh (system package or mise; needed for GitHub over HTTPS)")
   fi
 
   if ((${#optional_missing[@]})); then
@@ -546,6 +563,18 @@ report_skipped_targets() {
   fi
 }
 
+report_gh_auth() {
+  local gh_path
+  gh_path="$(find_gh)" || return 0
+
+  # From $HOME, like the credential helper, so a mise shim resolves the
+  # global gh version.
+  if ! (cd "$HOME" && "$gh_path" auth status --hostname github.com > /dev/null 2>&1); then
+    warn "gh is not logged in to github.com, so git cannot authenticate GitHub HTTPS remotes."
+    warn "Run: gh auth login --hostname github.com --git-protocol https"
+  fi
+}
+
 main() {
   local os_family
 
@@ -572,6 +601,7 @@ main() {
   fi
 
   report_skipped_targets
+  report_gh_auth
 
   log "Setup complete."
   if [[ "$profile" == "desktop" ]]; then
