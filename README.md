@@ -58,14 +58,14 @@ required tools are missing.
 For the desktop profile, Arch / Manjaro:
 
 ```bash
-sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm
+sudo pacman -S --needed git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh procps-ng curl ca-certificates zsh-autosuggestions nvm github-cli
 ```
 
 Ubuntu:
 
 ```bash
 sudo apt update
-sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions
+sudo apt install git bash vim zsh kitty ripgrep fzf bat lsd zoxide btop fontconfig openssh-client procps curl ca-certificates zsh-autosuggestions gh
 ```
 
 Install `nvm` separately on Ubuntu before rerunning setup. On some Ubuntu
@@ -73,8 +73,9 @@ releases, the `bat` package exposes `batcat`; the shell config handles either
 command.
 
 The remote profile requires only `git bash vim zsh curl ca-certificates`.
-`ripgrep fzf bat lsd zoxide btop` are optional there. Setup runs without them,
-and the shell config wires up the ones it uses when they are present.
+`ripgrep fzf bat lsd zoxide btop gh` are optional there. Setup runs without them,
+and the shell config wires up the ones it uses when they are present. On remote
+boxes `gh` may also come from mise; see [GitHub authentication](#github-authentication).
 
 ## Setup
 
@@ -102,6 +103,27 @@ The script is intended to be rerunnable. Existing config files are not
 overwritten silently: interactive runs ask before backing up and replacing a
 file, and declining keeps the file and continues; non-interactive runs skip
 it with a warning. Skipped files are reported at the end.
+
+## GitHub authentication
+
+The Git config authenticates GitHub over HTTPS (`github.com` and
+`gist.github.com`) with the token from the GitHub CLI, so no SSH key or
+personal access token is needed for HTTPS remotes. Log in once per machine:
+
+```bash
+gh auth login --hostname github.com --git-protocol https
+```
+
+Setup warns at the end when `gh` is not logged in. On boxes provisioned
+without a login, exporting `GH_TOKEN` works too.
+
+The credential helper replaces any other helper for these hosts. It runs
+`/usr/bin/gh` (the Ubuntu and Arch/Manjaro packages) or, failing that, the mise
+shim, but never `gh` from `PATH`: `PATH` can start with `./node_modules/.bin`,
+and a repo must not be able to receive the token. Without either, Git falls
+back to `GIT_ASKPASS` or a prompt. For a `gh` elsewhere, override the helper in
+`~/.gitconfig.local`, starting with an empty `helper =` line. SSH remotes are
+unaffected and keep using SSH keys.
 
 ## Remote boxes
 

@@ -7,5 +7,21 @@
 	default = simple
 [init]
 	defaultBranch = main
+# GitHub over HTTPS authenticates with the token from `gh auth login`.
+# The empty helper drops any helper configured earlier, so nothing else
+# answers with a stale token or stores gh's token.
+# gh is looked up at fixed locations instead of on PATH, because PATH can
+# start with ./node_modules/.bin and a repo must not receive the token. The
+# mise shim covers boxes that install gh through mise; it runs from $HOME so
+# the global gh version applies, not a repo's (possibly untrusted) mise.toml.
+# Without either gh, the helper answers nothing and git falls back to
+# GIT_ASKPASS or a prompt.
+[credential "https://github.com"]
+	helper =
+	helper = "!f() { for gh in /usr/bin/gh \"${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims/gh\"; do if [ -x \"$gh\" ]; then cd \"$HOME\" && exec \"$gh\" auth git-credential \"$@\"; fi; done; }; f"
+[credential "https://gist.github.com"]
+	helper =
+	helper = "!f() { for gh in /usr/bin/gh \"${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims/gh\"; do if [ -x \"$gh\" ]; then cd \"$HOME\" && exec \"$gh\" auth git-credential \"$@\"; fi; done; }; f"
+# Last, so machine-local settings override everything above.
 [include]
 	path = ~/.gitconfig.local
