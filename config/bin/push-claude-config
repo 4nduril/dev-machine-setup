@@ -14,17 +14,18 @@
 # value of 0 is not copied, because Claude Code reads 0 as "delete every
 # transcript and stop writing new ones".
 #
-# Mirroring makes this the only writer of those two directories on a target.
-# Anything else that populates them, such as a Coder dotfiles layer
-# symlinking users/<login>/claude/skills/ into ~/.claude/skills/, will have
-# its entries deleted here. Pick one mechanism per directory.
+# Mirroring deletes target entries that do not exist here, except for these,
+# which are excluded and therefore also protected from --delete:
 #
-# `skills/synced/` is the exception and stays excluded. Claude Code downloads
-# the account's own skill bundle there on every machine it runs on, so pushing
-# it would mean two writers for one tree: the copies differ per machine, rsync
-# resends them on every run, and --delete removes a bundle the target fetched
-# under a different id. Excluded paths are also protected from --delete, so a
-# target keeps whatever it downloaded for itself.
+# - Symlinks in skills/ or rules/ that point into the Coder dotfiles layer
+#   (~/.config/coderv2/dotfiles/). The layer links its shared skills there on
+#   every workspace start, so it owns those entries on that target.
+# - `skills/synced/`. Claude Code downloads the account's own skill bundle
+#   there on every machine it runs on, so pushing it would mean two writers
+#   for one tree: the copies differ per machine, rsync resends them on every
+#   run, and --delete removes a bundle the target fetched under a different id.
+# - `skills/.trash/`. Claude Code moves removed skills there; it is per
+#   machine and nothing reads it.
 set -euo pipefail
 
 usage() {
@@ -88,14 +89,40 @@ cat "$tmp" >"$f"
 rm "$tmp"
 '
 
+# Runs on the target. Prints each skills/ and rules/ entry that is a symlink
+# into the Coder dotfiles layer, as <dir>/<name>.
+# shellcheck disable=SC2016 # expanded by the remote bash, not here
+list_layer_links='
+for d in skills rules; do
+  [[ -d "$HOME/.claude/$d" ]] || continue
+  find "$HOME/.claude/$d" -mindepth 1 -maxdepth 1 -type l \
+    -lname "$HOME/.config/coderv2/dotfiles/*" -printf "$d/%f\n"
+done
+'
+
+# $1 is skills or rules, the rest are <dir>/<name> entries. Prints an anchored
+# rsync exclude for each entry in that dir.
+excludes_for() {
+  local dir=$1
+  shift
+  printf '%s\n' "$@" | sed -n "s|^$dir/\(.\+\)$|--exclude=/\1|p"
+}
+
 for host in "${hosts[@]}"; do
   printf '==> %s\n' "$host"
   if ((${#dry_run[@]} == 0)); then
     ssh "$host" 'mkdir -p ~/.claude/rules ~/.claude/skills'
   fi
+  mapfile -t layer_links < <(ssh "$host" bash -s <<<"$list_layer_links")
+  if ((${#layer_links[@]} > 0)); then
+    printf 'keeping dotfiles-layer link: %s\n' "${layer_links[@]}"
+  fi
+  mapfile -t rules_excludes < <(excludes_for rules "${layer_links[@]}")
+  mapfile -t skills_excludes < <(excludes_for skills "${layer_links[@]}")
   rsync "${dry_run[@]}" -ai "$HOME/.claude/CLAUDE.md" "$host:.claude/CLAUDE.md"
-  rsync "${dry_run[@]}" -ai --delete "$HOME/.claude/rules/" "$host:.claude/rules/"
-  rsync "${dry_run[@]}" -ai --delete --exclude 'synced/' "$HOME/.claude/skills/" "$host:.claude/skills/"
+  rsync "${dry_run[@]}" -ai --delete "${rules_excludes[@]}" "$HOME/.claude/rules/" "$host:.claude/rules/"
+  rsync "${dry_run[@]}" -ai --delete --exclude 'synced/' --exclude '.trash/' "${skills_excludes[@]}" \
+    "$HOME/.claude/skills/" "$host:.claude/skills/"
   if [[ -n "$retention_days" ]]; then
     ssh "$host" bash -s -- "$retention_days" "$((${#dry_run[@]} > 0 ? 1 : 0))" <<<"$set_retention"
   fi
